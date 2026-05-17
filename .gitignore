@@ -1,0 +1,22 @@
+node_modules/
+.dev.vars
+.env
+.env.local
+.wrangler/
+dist/
+*.log
+.DS_Store
+.idea/
+.vscode/
+
+# Claude Code / gstack metadata
+.claude/
+_session.json
+
+# Stray binary artifacts from tool experiments
+*.bin
+bu_openapi.json
+/tmp/
+
+# Bun lockfile (optional — keep or remove based on team preference)
+# bun.lockb

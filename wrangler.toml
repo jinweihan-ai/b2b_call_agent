@@ -1,0 +1,22 @@
+name = "b2b-call-agent"
+main = "src/index.ts"
+compatibility_date = "2026-05-01"
+
+# Local dev: copy .dev.vars.example to .dev.vars and fill in.
+# Production:  wrangler secret put NAME   (one per secret below)
+
+# Non-secret vars (none in M1 — all 4 are secrets).
+# [vars]
+# EXAMPLE = "value"
+
+# M2 — call replay storage (Workers KV).
+# For local dev, the `id` below is treated as a local namespace name; wrangler
+# dev keeps state in .wrangler/. For production deploy:
+#   wrangler kv:namespace create CALLS
+# and replace the id with the value it prints.
+[[kv_namespaces]]
+binding = "CALLS"
+id = "calls_local"
+
+[observability]
+enabled = true

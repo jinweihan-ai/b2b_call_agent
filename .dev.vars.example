@@ -1,0 +1,21 @@
+# Cloudflare Workers local-dev secrets.
+# Copy this file to `.dev.vars` (gitignored) and fill in real values.
+# `wrangler dev` reads .dev.vars automatically and injects them as `c.env.NAME`.
+#
+# For production, register each as a secret:
+#   wrangler secret put AIRTABLE_TOKEN
+#   wrangler secret put AIRTABLE_BASE_ID
+#   wrangler secret put AIRTABLE_TABLE_NAME
+#   wrangler secret put SLACK_WEBHOOK_URL
+
+AIRTABLE_TOKEN="patXXXXXXXXXXXX.XXXXXXXXXXXX"
+AIRTABLE_BASE_ID="appXXXXXXXXXXXXXX"
+AIRTABLE_TABLE_NAME="Calls"
+SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T0000/B0000/XXXXXXXXXX"
+AGENT_PHONE_SIGNING_SECRET="whsec_XXXXXXXXXXXXXXXXXXXXXXXX"  # HMAC-SHA256. Stored in M1, verified in M2.
+# M2.1 — Agent Phone REST API for fetching call recordings via /v1/calls/{id}.
+AGENT_PHONE_API_KEY="sk_live_XXXXXXXXXXXX"
+AGENT_PHONE_API_BASE="https://api.agentphone.ai/v1"
+# M7 — shared API key for REST API (/api/v1/*) and MCP (/mcp). Downstream
+# systems / AI agents pass this via the `X-API-Key` header.
+API_KEY="generate-with-openssl-rand-hex-32"
