@@ -26,12 +26,25 @@ ARTIFACT 1 — customer_sms (English, ASCII only, plain text)
 • Include the literal token {PRODUCT_URL} as a placeholder — the system will substitute the real URL.
 • End with "— FerroLaser Sales" so the recipient knows who it's from.
 
-ARTIFACT 2 — supplier_rfq (Simplified Chinese)
-• Internal email to FerroLaser China production team — confirming the deal is real + asking for capacity check, accurate lead time, and pricing.
-• Format: Chinese business email. Headline line, bulleted requirements, ask, sign-off.
-• Include: recommended SKU, customer's material + thickness + volume + budget + timeline + buyer persona, any cross-cultural notes (e.g., customer expects English support, US shipping address pending).
-• Plain text, no markdown. Max 500 chars Chinese.
-• Mention the call_id so the China team can cross-reference.
+ARTIFACT 2 — supplier_rfq (BILINGUAL: Simplified Chinese + English, line-paired)
+• Internal message to FerroLaser China production team — confirming the deal is real + asking for capacity check, accurate lead time, and pricing.
+• BILINGUAL FORMAT: every line is written first in Simplified Chinese, then immediately translated to English on the next line. Chinese line, then English line, then a blank line between distinct blocks. The China team reads the Chinese; the English mirror helps when they forward to their boss, paste into translation tools, or coordinate with the US sales rep.
+• Structure: subject line → greeting → customer context (name + persona + region) → bulleted spec requirements (material / thickness / volume / budget / timeline) → ask (capacity, pricing, lead time, US shipping note) → sign-off. EVERY single line gets its English translation immediately below.
+• Include: recommended SKU, customer's material + thickness + volume + budget + timeline + buyer persona, any cross-cultural notes (e.g., customer expects English support, US shipping address pending). Mention the call_id once near the top.
+• Plain text only, no markdown. Max 1200 chars total (bilingual is naturally ~2x longer than monolingual).
+
+Example bilingual format:
+主题：cmp123xyz 询价 - STJ1390-2 / 6mm 铝
+Subject: cmp123xyz RFQ - STJ1390-2 / 6mm aluminum
+
+生产团队您好，
+Hi production team,
+
+我们有一位美国客户 Sarah，加州小型 sign shop 老板。
+We have a US customer Sarah, a small sign-shop owner in California.
+
+请确认产能、报价和交期。谢谢！
+Please confirm capacity, pricing, and lead time. Thanks!
 
 ARTIFACT 3 — briefing (markdown, English)
 • For the US-side sales rep about to call this lead back.
@@ -141,7 +154,7 @@ export async function generateDrafts(
     systemInstruction: SYSTEM_INSTRUCTION,
     userPrompt,
     responseSchema: RESPONSE_SCHEMA,
-    maxOutputTokens: 2048, // 3 artifacts — needs headroom
+    maxOutputTokens: 3072, // 3 artifacts; supplier_rfq is now bilingual (~2x size)
     temperature: 0.5,
     model: "gemini-2.5-flash",
     timeoutMs: 15000, // post-call, no live latency pressure
