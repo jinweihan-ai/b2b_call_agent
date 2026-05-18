@@ -10,8 +10,25 @@ When the phone rings while your team's asleep, this app picks up, qualifies the 
 
 ---
 
+## Screenshots · 截图
+
+**Sales cockpit · 销售仪表盘** — one card per customer, deduped by phone, with AI prep chips + research enrichment inline.
+
+![Sales cockpit dashboard with kanban pipeline](docs/screenshots/dashboard.png)
+
+**Customer workspace — brief · 客户工作台（Brief 部分）** — one URL per customer (`/person/+phone`). Inline rename, qualification score, caller research summary, recommended SKU, all on one card.
+
+![Customer workspace brief card with qualification and research](docs/screenshots/person-brief.png)
+
+**Customer workspace — timeline + drafts · 客户工作台（时间轴 + 草稿）** — every call's transcript (with audio when available), every action taken, alongside the AI-drafted SMS / Chinese supplier RFQ / internal briefing waiting for review.
+
+![Customer workspace timeline with all calls and AI-drafted actions](docs/screenshots/person-timeline.png)
+
+---
+
 - [中文 README](#中文)
 - [English README](#english)
+- [Contributing · 贡献指南](CONTRIBUTING.md)
 
 ---
 
