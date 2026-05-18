@@ -13,6 +13,8 @@
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![GitHub stars](https://img.shields.io/github/stars/jinweihan-ai/b2b_call_agent?style=social)](https://github.com/jinweihan-ai/b2b_call_agent/stargazers)
 
+🌍 **在线 Demo**: <https://b2b-call-agent.jinwei-han93.workers.dev/> · REST: `/api/v1` · MCP: `/mcp`（两个都需要 `X-API-Key`）
+
 ---
 
 ## 截图
