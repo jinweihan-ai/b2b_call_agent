@@ -10,13 +10,14 @@ compatibility_date = "2026-05-01"
 # EXAMPLE = "value"
 
 # M2 — call replay storage (Workers KV).
-# For local dev, the `id` below is treated as a local namespace name; wrangler
-# dev keeps state in .wrangler/. For production deploy:
-#   wrangler kv:namespace create CALLS
-# and replace the id with the value it prints.
+# `id` = production namespace (Cloudflare-account-scoped).
+# `preview_id` = local-dev namespace name (wrangler keeps state in .wrangler/).
+# If you fork: run `npx wrangler kv namespace create CALLS` and replace the id
+# below with the one wrangler prints (your account, your namespace).
 [[kv_namespaces]]
 binding = "CALLS"
-id = "calls_local"
+id = "124465323baf49fab2ae9254c26d3b35"
+preview_id = "calls_local"
 
 [observability]
 enabled = true
