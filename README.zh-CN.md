@@ -4,6 +4,8 @@
 
 > 🌐 [English](README.md) · **中文**
 
+[![CI](https://github.com/jinweihan-ai/b2b_call_agent/actions/workflows/ci.yml/badge.svg)](https://github.com/jinweihan-ai/b2b_call_agent/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/jinweihan-ai/b2b_call_agent?color=success)](https://github.com/jinweihan-ai/b2b_call_agent/releases)
 [![License: MIT](https://img.shields.io/github/license/jinweihan-ai/b2b_call_agent?color=blue)](LICENSE)
 [![TypeScript strict](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](tsconfig.json)
 [![Cloudflare Workers](https://img.shields.io/badge/runtime-Cloudflare%20Workers-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com)
