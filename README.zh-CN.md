@@ -4,7 +4,12 @@
 
 > 🌐 [English](README.md) · **中文**
 
-**开源 · MIT 许可**
+[![License: MIT](https://img.shields.io/github/license/jinweihan-ai/b2b_call_agent?color=blue)](LICENSE)
+[![TypeScript strict](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](tsconfig.json)
+[![Cloudflare Workers](https://img.shields.io/badge/runtime-Cloudflare%20Workers-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com)
+[![MCP](https://img.shields.io/badge/MCP-Streamable%20HTTP-8A2BE2)](https://modelcontextprotocol.io)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![GitHub stars](https://img.shields.io/github/stars/jinweihan-ai/b2b_call_agent?style=social)](https://github.com/jinweihan-ai/b2b_call_agent/stargazers)
 
 ---
 
