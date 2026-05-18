@@ -56,6 +56,10 @@ export interface PersonSummary {
   latest_state: CallState | null;
   latest_tier: string | null;
   latest_score: number | null;
+  // From the latest call's Gemini extraction. Lets MCP/REST consumers
+  // filter on industry without having to load the full call detail.
+  latest_buyer_persona: string | null;
+  latest_application: string | null;
   research_status: "pending" | "done" | "failed" | null;
   research_company: string | null;
   research_industry: string | null;
@@ -211,6 +215,8 @@ function summarizePerson(lead: LeadIndex, latest: CallRecord | null): PersonSumm
     latest_state: latest ? normalizeState(latest.state) : null,
     latest_tier: ent?.qual_tier ?? null,
     latest_score: ent?.qual_score ?? null,
+    latest_buyer_persona: ent?.buyer_persona ?? null,
+    latest_application: ent?.application ?? null,
     research_status: lead.research?.status ?? null,
     research_company: lead.research?.company_name ?? null,
     research_industry: lead.research?.industry ?? null,
