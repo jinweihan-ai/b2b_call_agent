@@ -8,9 +8,7 @@ import {
   handleSendCustomerSms,
   handleSendSupplierRfq,
   handleAckBriefing,
-  handleSetOutcome,
-  handleMoveToQuoted,
-  handleMoveToNegotiating,
+  handleArchive,
   handleResearchCaller,
   handleRenamePerson,
 } from "./handlers/actions";
@@ -37,9 +35,7 @@ app.get("/health", (c) =>
       "POST /call/:id/send/customer_sms",
       "POST /call/:id/send/supplier_rfq",
       "POST /call/:id/ack/briefing",
-      "POST /call/:id/outcome",
-      "POST /call/:id/move-to-quoted",
-      "POST /call/:id/move-to-negotiating",
+      "POST /call/:id/archive",
       "POST /call/:id/research-caller",
       "GET /person/:phone",
       "GET /person/:phone/json",
@@ -88,18 +84,12 @@ app.post("/call/:id/send/supplier_rfq", async (c) => {
   return handleSendSupplierRfq(c.req.param("id"), formData, c.env);
 });
 app.post("/call/:id/ack/briefing", async (c) => handleAckBriefing(c.req.param("id"), c.env));
-app.post("/call/:id/outcome", async (c) => {
+// v0.2: archive (hand off to customer's own CRM). Replaces the M5 stage
+// transitions (move-to-quoted / move-to-negotiating / outcome) since we
+// can't actually observe downstream events anyway.
+app.post("/call/:id/archive", async (c) => {
   const formData = await c.req.formData();
-  return handleSetOutcome(c.req.param("id"), formData, c.env);
-});
-// M5: CRM-stage transitions (manual advance through the sales pipeline).
-app.post("/call/:id/move-to-quoted", async (c) => {
-  const formData = await c.req.formData();
-  return handleMoveToQuoted(c.req.param("id"), formData, c.env);
-});
-app.post("/call/:id/move-to-negotiating", async (c) => {
-  const formData = await c.req.formData();
-  return handleMoveToNegotiating(c.req.param("id"), formData, c.env);
+  return handleArchive(c.req.param("id"), formData, c.env);
 });
 
 // M6: Caller research via Browser Use cloud — kicks off an async session;

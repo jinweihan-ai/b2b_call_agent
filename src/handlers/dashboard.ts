@@ -239,15 +239,10 @@ function renderCard(c: CallSummary): string {
     )
     .join("");
 
-  // Sub-indicators specific to later stages
-  let stageDetail = "";
-  if (c.state === "quoted" && c.factory_price !== null) {
-    const lt = c.factory_lead_time !== null ? ` · ${c.factory_lead_time}wk` : "";
-    stageDetail = `<div class="stage-detail">🏭 Factory: $${c.factory_price.toLocaleString()}${lt}</div>`;
-  } else if (c.state === "negotiating" && c.customer_sentiment) {
-    const emoji = c.customer_sentiment === "positive" ? "👍" : c.customer_sentiment === "objecting" ? "⚠️" : "💬";
-    stageDetail = `<div class="stage-detail">${emoji} Customer: ${escapeHtml(c.customer_sentiment)}</div>`;
-  }
+  // v0.2: no per-stage detail line on cards — the brief + research line
+  // already convey enough. Removed the quoted/negotiating sub-indicators
+  // along with the downstream pipeline stages themselves.
+  const stageDetail = "";
 
   // Caller identity line — prefer sales-rep-set display_name, else fall
   // back to the Gemini-extracted caller_name / caller_company.
@@ -303,38 +298,29 @@ function renderCard(c: CallSummary): string {
 const COLUMN_LABELS: Record<CallState, { label: string; emoji: string; color: string; collapsed?: boolean }> = {
   new_lead:      { label: "New Lead",      emoji: "🆕", color: "#0ea5e9" },
   outreach_sent: { label: "Outreach Sent", emoji: "📤", color: "#8b5cf6" },
-  quoted:        { label: "Quoted",        emoji: "📄", color: "#f59e0b" },
-  negotiating:   { label: "Negotiating",   emoji: "💬", color: "#ec4899" },
-  closed_won:    { label: "Closed Won",    emoji: "🎉", color: "#16a34a", collapsed: true },
-  closed_lost:   { label: "Closed Lost",   emoji: "❌", color: "#94a3b8", collapsed: true },
-  nurture:       { label: "Nurture",       emoji: "🌱", color: "#65a30d", collapsed: true },
+  archived:      { label: "Archived",      emoji: "📦", color: "#78716c", collapsed: true },
 };
 
 function renderDashboard(calls: CallSummary[]): string {
   const grouped: Record<CallState, CallSummary[]> = {
     new_lead: [],
     outreach_sent: [],
-    quoted: [],
-    negotiating: [],
-    closed_won: [],
-    closed_lost: [],
-    nurture: [],
+    archived: [],
   };
   for (const c of calls) grouped[c.state].push(c);
 
   const stats = {
     total: calls.length,
-    pipeline: grouped.new_lead.length + grouped.outreach_sent.length + grouped.quoted.length + grouped.negotiating.length,
-    quoted: grouped.quoted.length,
-    won: grouped.closed_won.length,
+    active: grouped.new_lead.length + grouped.outreach_sent.length,
+    archived: grouped.archived.length,
   };
 
-  // Compute pipeline value (sum of budget_max for non-terminal stages)
-  const pipelineCalls = [...grouped.new_lead, ...grouped.outreach_sent, ...grouped.quoted, ...grouped.negotiating];
-  const pipelineValue = pipelineCalls.reduce((sum, c) => sum + (c.budget_max ?? c.budget_min ?? 0), 0);
+  // Pipeline value = sum of budget_max for leads still in active stages.
+  const activeCalls = [...grouped.new_lead, ...grouped.outreach_sent];
+  const pipelineValue = activeCalls.reduce((sum, c) => sum + (c.budget_max ?? c.budget_min ?? 0), 0);
 
-  const activeStages: CallState[] = ["new_lead", "outreach_sent", "quoted", "negotiating"];
-  const collapsedStages: CallState[] = ["closed_won", "closed_lost", "nurture"];
+  const activeStages: CallState[] = ["new_lead", "outreach_sent"];
+  const collapsedStages: CallState[] = ["archived"];
 
   return `<!doctype html>
 <html lang="en">
@@ -390,11 +376,10 @@ function renderDashboard(calls: CallSummary[]): string {
   .board-wrap { padding: 20px; }
   .board {
     display: grid;
-    grid-template-columns: repeat(4, minmax(240px, 1fr));
+    grid-template-columns: repeat(2, minmax(280px, 1fr));
     gap: 14px;
     margin-bottom: 20px;
   }
-  @media (max-width: 1100px) { .board { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 640px)  { .board { grid-template-columns: 1fr; } }
   .column {
     background: var(--card);
@@ -440,10 +425,9 @@ function renderDashboard(calls: CallSummary[]): string {
   }
   .terminal-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: 1fr;
     gap: 14px;
   }
-  @media (max-width: 800px) { .terminal-grid { grid-template-columns: 1fr; } }
   .terminal-col h4 {
     margin: 0 0 8px;
     font-size: 12px;
@@ -587,14 +571,14 @@ function renderDashboard(calls: CallSummary[]): string {
 
 <header class="top">
   <h1>🛠️ FerroLaser Sales Cockpit</h1>
-  <div class="sub">CRM pipeline · AI drafts every outbound message, you review + send.</div>
+  <div class="sub">First-24h inquiry response · AI drafts every outbound message; you review + send + hand off to your CRM.</div>
 </header>
 
 <div class="stats">
   <div class="stat"><div class="v">${stats.total}</div><div class="l">Total leads (24h)</div></div>
-  <div class="stat"><div class="v">${stats.pipeline}</div><div class="l">Active pipeline</div></div>
-  <div class="stat"><div class="v">$${(pipelineValue / 1000).toFixed(0)}k</div><div class="l">Pipeline value</div></div>
-  <div class="stat"><div class="v">${stats.won}</div><div class="l">Won</div></div>
+  <div class="stat"><div class="v">${stats.active}</div><div class="l">Active</div></div>
+  <div class="stat"><div class="v">$${(pipelineValue / 1000).toFixed(0)}k</div><div class="l">Active value</div></div>
+  <div class="stat"><div class="v">${stats.archived}</div><div class="l">Archived</div></div>
 </div>
 
 <div class="board-wrap">

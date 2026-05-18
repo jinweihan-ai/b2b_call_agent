@@ -6,7 +6,7 @@ Drafted for **YC Hackathon 2026 — "call my agent" track**. Copy-paste sections
 
 ## Tagline (140 char limit)
 
-**AI inquiry copilot for Chinese B2B export manufacturers — answer every overseas call, draft every reply, in any language, while you sleep.**
+**First-24h inquiry response for Chinese B2B exporters — AI answers the call, drafts every reply, packages a hand-off for your CRM, in any language.**
 
 ---
 
@@ -174,8 +174,8 @@ Designed to ship as a standard SaaS. China has tens of thousands of B2B export c
 
 **2:20-2:50 · MCP / AI integration**
 - Open Claude Desktop / Cursor
-- Show that the MCP server exposes 15 tools mapped to the CRM
-- Ask the agent: "Find me a hot lead in the sign-shop industry and start the supplier RFQ" — watch it call list_persons → get_person → send_rfq
+- Show that the MCP server exposes 13 tools mapped to the REST API
+- Ask the agent: "Find me a hot lead in the sign-shop industry and post the supplier RFQ" — watch it call list_persons → get_person → send_rfq
 
 **2:50-3:00 · Close**
 > "AI is the autopilot. The human stays accountable. Open source, MIT licensed. github.com/jinweihan-ai/b2b_call_agent."

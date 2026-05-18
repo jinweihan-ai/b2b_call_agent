@@ -1,6 +1,5 @@
 import type { Bindings } from "../types";
 import type { CallRecord } from "../lib/render";
-import { postSlackMessage } from "../lib/slack";
 import { createResearchTask } from "../lib/browser-use";
 import { getLead, saveLead, normalizePhone, type LeadIndex } from "../lib/leads";
 import {
@@ -149,7 +148,11 @@ export async function handleAckBriefing(
   return redirectTo(leadOrCallUrl(rec, "?ok=briefing"));
 }
 
-export async function handleSetOutcome(
+// ── Archive (hand off to the customer's own CRM) ────────────────────
+// v0.2: the only post-outreach action. Marks the lead as done from our
+// side — downstream stages (quote / negotiation / close) live in the
+// customer's HubSpot / Salesforce / Feishu OA, not here.
+export async function handleArchive(
   callId: string,
   formData: FormData,
   env: Bindings
@@ -157,71 +160,15 @@ export async function handleSetOutcome(
   const rec = await loadRecord(env, callId);
   if (!rec) return new Response("Call not found", { status: 404 });
 
-  const outcome = String(formData.get("outcome") ?? "");
-  if (outcome !== "won" && outcome !== "lost" && outcome !== "nurture") {
-    return redirectTo(leadOrCallUrl(rec, "?err=bad_outcome"));
-  }
-
   rec.actions = {
     ...(rec.actions ?? {}),
-    outcome: outcome as "won" | "lost" | "nurture",
-    outcome_at: new Date().toISOString(),
-    outcome_note: String(formData.get("note") ?? "") || undefined,
+    archived_at: new Date().toISOString(),
+    archived_note: String(formData.get("note") ?? "").trim() || undefined,
   };
   withStateChange(rec);
   await saveRecord(env, rec);
-  console.log("[actions] outcome", outcome, "set for", callId);
-  // Suppress unused-import warning for postSlackMessage helper.
-  void postSlackMessage;
-  return redirectTo(`/?ok=outcome_${outcome}`);
-}
-
-// ── Stage transitions (CRM pipeline) ────────────────────────────────
-
-// Move outreach_sent → quoted. Sales captures the factory's confirmed
-// price + lead time + (implicitly) that the quote has been forwarded to
-// the customer.
-export async function handleMoveToQuoted(
-  callId: string,
-  formData: FormData,
-  env: Bindings
-): Promise<Response> {
-  const rec = await loadRecord(env, callId);
-  if (!rec) return new Response("Call not found", { status: 404 });
-
-  const factory_price_usd_raw = formData.get("factory_price_usd");
-  const factory_lead_time_weeks_raw = formData.get("factory_lead_time_weeks");
-  const factory_price_usd =
-    factory_price_usd_raw !== null && factory_price_usd_raw !== ""
-      ? Number(factory_price_usd_raw)
-      : undefined;
-  const factory_lead_time_weeks =
-    factory_lead_time_weeks_raw !== null && factory_lead_time_weeks_raw !== ""
-      ? Number(factory_lead_time_weeks_raw)
-      : undefined;
-  const notes = String(formData.get("notes") ?? "") || undefined;
-  const now = new Date().toISOString();
-
-  rec.actions = {
-    ...(rec.actions ?? {}),
-    quote: {
-      factory_confirmed_at: now,
-      factory_price_usd:
-        typeof factory_price_usd === "number" && Number.isFinite(factory_price_usd)
-          ? factory_price_usd
-          : undefined,
-      factory_lead_time_weeks:
-        typeof factory_lead_time_weeks === "number" && Number.isFinite(factory_lead_time_weeks)
-          ? factory_lead_time_weeks
-          : undefined,
-      quote_sent_to_customer_at: now,
-      notes,
-    },
-  };
-  withStateChange(rec);
-  await saveRecord(env, rec);
-  console.log("[actions] moved to quoted:", callId);
-  return redirectTo(leadOrCallUrl(rec, "?ok=quoted"));
+  console.log("[actions] archived:", callId);
+  return redirectTo(leadOrCallUrl(rec, "?ok=archived"));
 }
 
 // ── Rename a lead ────────────────────────────────────────────────────
@@ -313,28 +260,3 @@ export async function handleResearchCaller(
 
 // Move quoted → negotiating. Sales captures that the customer responded
 // (sentiment + notes optional).
-export async function handleMoveToNegotiating(
-  callId: string,
-  formData: FormData,
-  env: Bindings
-): Promise<Response> {
-  const rec = await loadRecord(env, callId);
-  if (!rec) return new Response("Call not found", { status: 404 });
-
-  const sentiment = String(formData.get("sentiment") ?? "").trim();
-  rec.actions = {
-    ...(rec.actions ?? {}),
-    customer_response: {
-      received_at: new Date().toISOString(),
-      sentiment:
-        sentiment === "positive" || sentiment === "negotiating" || sentiment === "objecting"
-          ? (sentiment as "positive" | "negotiating" | "objecting")
-          : undefined,
-      notes: String(formData.get("notes") ?? "") || undefined,
-    },
-  };
-  withStateChange(rec);
-  await saveRecord(env, rec);
-  console.log("[actions] moved to negotiating:", callId);
-  return redirectTo(leadOrCallUrl(rec, "?ok=negotiating"));
-}

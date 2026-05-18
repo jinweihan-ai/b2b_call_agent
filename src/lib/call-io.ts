@@ -26,15 +26,12 @@ export async function saveRecord(env: Bindings, rec: CallRecord): Promise<void> 
   await env.CALLS.put(rec.call_id, JSON.stringify(rec), { expirationTtl: 86400 });
 }
 
-// CRM stage derived from actions. Outcome > customer_response > quote >
-// 3-of-3 outreach actions > new_lead.
+// v0.2 state: archived > 3-of-3 outreach actions > new_lead.
+// Down-stream stages (quoted / negotiating / won / lost / nurture) live in
+// the customer's own CRM now — we don't track them here.
 export function computeState(rec: CallRecord): CallState {
   const a = rec.actions ?? {};
-  if (a.outcome === "won") return "closed_won";
-  if (a.outcome === "lost") return "closed_lost";
-  if (a.outcome === "nurture") return "nurture";
-  if (a.customer_response) return "negotiating";
-  if (a.quote) return "quoted";
+  if (a.archived_at) return "archived";
   const sent = [a.customer_sms, a.supplier_rfq, a.briefing].filter(Boolean).length;
   if (sent >= 3) return "outreach_sent";
   return "new_lead";

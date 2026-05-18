@@ -44,45 +44,48 @@ export interface CallRecord {
   actions?: CallActions;
 }
 
-// CRM-style sales pipeline stages (manufacturing B2B convention).
-// Replaces the M4 "AI task progress" states which conflated internal
-// progress with funnel position. AI-prep status is now a sub-indicator
-// on each card, not the primary axis.
+// M7 "first-24h response system" state machine. We deliberately stop the
+// AI's responsibility at the moment the sales rep has the briefing + drafts
+// + research in hand. Past that point the deal lives in the customer's own
+// CRM (HubSpot / Salesforce / Feishu / etc.) — we don't pretend to track
+// quote / negotiation / close because we can't actually observe those.
+//
+// Old per-call states (quoted / negotiating / closed_won / closed_lost /
+// nurture) collapse to `archived` via normalizeState. Old KV records still
+// load and render; they just show in the Archived column.
 export type CallState =
   | "new_lead"        // AI qualified; sales rep hasn't sent outreach yet
-  | "outreach_sent"   // 3 AI drafts approved + sent; awaiting customer/factory reply
-  | "quoted"          // Factory confirmed price+lead time; formal quote sent to customer
-  | "negotiating"     // Customer engaged with quote; active back-and-forth
-  | "closed_won"
-  | "closed_lost"
-  | "nurture";        // Not buying now but might re-engage later; separate from Lost
+  | "outreach_sent"   // 3 AI drafts approved + sent; ready for sales rep to take over
+  | "archived";       // Handed off to the customer's own CRM (or dismissed as bad fit)
 
-// Legacy states from the M4 (pre-CRM) iteration. Old KV records still carry
-// these; the dashboard maps them to display columns.
+// Legacy states the dashboard still has to read from old KV records.
 export type LegacyCallState =
   | "qualified"        // → New Lead
   | "drafts_ready"     // → New Lead
   | "partially_sent"   // → New Lead
   | "all_sent"         // → Outreach Sent
-  | "won"              // → Closed Won
-  | "lost";            // → Closed Lost
+  | "quoted"           // → Archived (was a downstream stage in v0.1)
+  | "negotiating"      // → Archived (was a downstream stage in v0.1)
+  | "won" | "closed_won"     // → Archived
+  | "lost" | "closed_lost"   // → Archived
+  | "nurture";         // → Archived
 
 export function normalizeState(s: string | undefined): CallState {
   switch (s) {
     case "new_lead":
     case "outreach_sent":
-    case "quoted":
-    case "negotiating":
-    case "closed_won":
-    case "closed_lost":
-    case "nurture":
-      return s;
+    case "archived":
+      return s as CallState;
     case "all_sent":
       return "outreach_sent";
+    case "quoted":
+    case "negotiating":
     case "won":
-      return "closed_won";
+    case "closed_won":
     case "lost":
-      return "closed_lost";
+    case "closed_lost":
+    case "nurture":
+      return "archived";
     // qualified / drafts_ready / partially_sent / undefined → New Lead
     default:
       return "new_lead";
@@ -108,7 +111,15 @@ export interface CallActions {
   briefing?: {
     acked_at: string;
   };
-  // CRM-stage transitions (manually captured by sales after real-world events).
+  // Sales rep marked this lead as "handed off to my CRM" — the AI's job is
+  // done. May or may not have completed all 3 outreach actions first.
+  archived_at?: string;
+  archived_note?: string;
+  // Time-in-stage tracking (set whenever state changes).
+  stage_entered_at?: string;
+  // Legacy fields preserved for old KV records that still need to render.
+  // Not written by current handlers. v0.2 dropped quote / customer_response /
+  // outcome tracking — see CallState comment.
   quote?: {
     factory_confirmed_at: string;
     factory_price_usd?: number;
@@ -124,8 +135,6 @@ export interface CallActions {
   outcome?: "won" | "lost" | "nurture";
   outcome_at?: string;
   outcome_note?: string;
-  // Time-in-stage tracking (set whenever state changes).
-  stage_entered_at?: string;
 }
 
 const SAFE_CHARS: Record<string, string> = {
@@ -1180,11 +1189,7 @@ export function renderReplayPage(
 const STATE_META: Record<CallState, { label: string; color: string; bg: string }> = {
   new_lead:      { label: "🆕 New Lead",       color: "#075985", bg: "#e0f2fe" },
   outreach_sent: { label: "📤 Outreach Sent",  color: "#5b21b6", bg: "#ede9fe" },
-  quoted:        { label: "📄 Quoted",         color: "#92400e", bg: "#fef3c7" },
-  negotiating:   { label: "💬 Negotiating",    color: "#9d174d", bg: "#fce7f3" },
-  closed_won:    { label: "🎉 Closed Won",     color: "#166534", bg: "#dcfce7" },
-  closed_lost:   { label: "❌ Closed Lost",    color: "#7f1d1d", bg: "#fee2e2" },
-  nurture:       { label: "🌱 Nurture",        color: "#365314", bg: "#ecfccb" },
+  archived:      { label: "📦 Archived",        color: "#44403c", bg: "#e7e5e4" },
 };
 
 // Top controls strip — back link, state pill, post-action notice banner, and
@@ -1207,8 +1212,7 @@ function renderTopControls(
     if (ok === "customer_sms") notice = `<div class="notice ok">✓ SMS sent to caller</div>`;
     else if (ok === "supplier_rfq") notice = `<div class="notice ok">✓ RFQ posted to #sourcing-china Slack</div>`;
     else if (ok === "briefing") notice = `<div class="notice ok">✓ Briefing marked as read</div>`;
-    else if (ok === "quoted") notice = `<div class="notice ok">✓ Moved to Quoted — factory confirmed</div>`;
-    else if (ok === "negotiating") notice = `<div class="notice ok">✓ Customer responded — now negotiating</div>`;
+    else if (ok === "archived") notice = `<div class="notice ok">📦 Lead archived. Continue in your own CRM.</div>`;
     else if (ok === "research_started") notice = `<div class="notice ok">🔍 Background check kicked off — Browser Use is researching now. This page will reflect results on refresh.</div>`;
     else if (ok === "research_pending") notice = `<div class="notice ok">🔍 A background check is already running for this caller. Refresh to see results.</div>`;
     else if (ok === "renamed") notice = `<div class="notice ok">✓ Customer name saved</div>`;
@@ -1247,27 +1251,13 @@ function renderActionsColumn(
   const state = normalizeState(rec.state);
   const callId = rec.call_id;
 
-  // Previous-stage info (quote details, customer response).
-  let stageInfo = "";
-  if (actions.quote) {
-    const q = actions.quote;
-    const priceStr = q.factory_price_usd ? `$${q.factory_price_usd.toLocaleString()}` : "—";
-    const ltStr = q.factory_lead_time_weeks ? `${q.factory_lead_time_weeks}wk lead time` : "—";
-    stageInfo += `<div class="stage-info-card">🏭 <strong>Factory quote confirmed</strong> · ${priceStr} · ${ltStr} · ${escapeHtml(q.factory_confirmed_at)}${q.notes ? `<br><em>${escapeHtml(q.notes)}</em>` : ""}</div>`;
-  }
-  if (actions.customer_response) {
-    const cr = actions.customer_response;
-    stageInfo += `<div class="stage-info-card">💬 <strong>Customer response</strong> · ${escapeHtml(cr.sentiment ?? "engaged")} · ${escapeHtml(cr.received_at)}${cr.notes ? `<br><em>${escapeHtml(cr.notes)}</em>` : ""}</div>`;
-  }
-
   const researchCard = renderResearchCard(lead, callId);
 
-  // Legacy calls (no drafts): still expose stageInfo + research + transitions.
+  // Legacy calls (no drafts): still expose research + transitions.
   if (!drafts) {
     const transitionBlock = renderStageTransition(state, callId, actions);
     return `<section class="action-panel">
       <h2>Actions</h2>
-      ${stageInfo}
       ${researchCard}
       ${transitionBlock}
     </section>`;
@@ -1313,7 +1303,6 @@ function renderActionsColumn(
 
   return `<section class="action-panel">
     <h2>Actions</h2>
-    ${stageInfo}
     ${researchCard}
     ${customerSmsCard}
     ${supplierRfqCard}
@@ -1683,11 +1672,24 @@ function renderTimeline(a: TimelineArgs): string {
     });
   }
 
-  // Final outcome
+  // v0.2 archive event
+  if (actions.archived_at) {
+    entries.push({
+      ts: actions.archived_at,
+      icon: "📦",
+      title: "Archived · handed off to customer CRM",
+      body: actions.archived_note
+        ? `<div class="preview">${escapeHtml(actions.archived_note)}</div>`
+        : `<div style="color:var(--muted);font-size:12px;">No note. The deal continues outside this system.</div>`,
+    });
+  }
+
+  // Legacy v0.1 outcome event — only renders for old KV records still in
+  // the lead's history. v0.2 doesn't write these.
   if (actions.outcome && actions.outcome_at) {
     const outcome = actions.outcome;
     const icon = outcome === "won" ? "🎉" : outcome === "lost" ? "❌" : "🌱";
-    const label = outcome === "won" ? "Closed Won" : outcome === "lost" ? "Closed Lost" : "Nurture";
+    const label = outcome === "won" ? "Closed Won (legacy)" : outcome === "lost" ? "Closed Lost (legacy)" : "Nurture (legacy)";
     entries.push({
       ts: actions.outcome_at,
       icon,
@@ -1854,67 +1856,39 @@ function formatRelativeFromIso(iso: string | null | undefined): string {
 }
 
 function renderStageTransition(state: CallState, callId: string, actions: CallActions): string {
-  // Terminal states: nothing to do
-  if (state === "closed_won" || state === "closed_lost" || state === "nurture") {
-    return "";
+  // Archived (terminal): nothing to do here. The lead lives in the customer's
+  // own CRM from this point on.
+  if (state === "archived") {
+    const when = actions.archived_at ? formatRelativeFromIso(actions.archived_at) : "—";
+    return `<div class="transition-bar" style="background:#fafaf9;border-color:#e7e5e4;">
+      <span style="font-size:13px;color:var(--muted);">📦 Archived ${escapeHtml(when)} ago${actions.archived_note ? ` — <em>${escapeHtml(actions.archived_note)}</em>` : ""}. Continue in your own CRM.</span>
+    </div>`;
   }
 
-  // new_lead: just show what happens automatically
+  // new_lead: show outreach progress + an early archive button (for bad fits).
   if (state === "new_lead") {
     const sent = [actions.customer_sms, actions.supplier_rfq, actions.briefing].filter(Boolean).length;
     return `<div class="transition-bar">
       <span class="label">Next step:</span>
       <span style="color:var(--muted);font-size:13px;">${sent}/3 outreach actions complete. Send all three to auto-advance to <strong>Outreach Sent</strong>.</span>
+      <form method="POST" action="/call/${encodeURIComponent(callId)}/archive" style="margin-top:10px;width:100%;">
+        <input type="text" name="note" placeholder="Reason (optional) — e.g. bad fit, spam, duplicate" style="width:60%;margin-right:6px;">
+        <button type="submit" class="secondary">📦 Archive (skip outreach)</button>
+      </form>
     </div>`;
   }
 
-  // outreach_sent: form to capture factory quote → Quoted
-  if (state === "outreach_sent") {
-    return `<form method="POST" action="/call/${encodeURIComponent(callId)}/move-to-quoted">
-      <div class="transition-bar">
-        <div style="width:100%;">
-          <div class="label" style="margin-bottom:10px;">🏭 Factory confirmed pricing + lead time? Capture and advance to <strong>Quoted</strong>:</div>
-          <div class="transition-row">
-            <input type="number" name="factory_price_usd" placeholder="Factory price (USD)" step="100">
-            <input type="number" name="factory_lead_time_weeks" placeholder="Lead time (weeks)" step="1">
-            <button type="submit" class="primary">Move to Quoted</button>
-          </div>
-          <input type="text" name="notes" placeholder="Notes (optional — what factory said, special terms...)">
+  // outreach_sent: hand off — the deal continues in the customer's own CRM.
+  return `<form method="POST" action="/call/${encodeURIComponent(callId)}/archive">
+    <div class="transition-bar">
+      <div style="width:100%;">
+        <div class="label" style="margin-bottom:10px;">📦 Done with the AI portion? Hand off to your own CRM (HubSpot / Salesforce / Feishu OA / Airtable):</div>
+        <div class="transition-row">
+          <input type="text" name="note" placeholder="Where it's going (optional) — e.g. HubSpot deal #1234">
+          <button type="submit" class="primary">📦 Hand off to my CRM</button>
         </div>
       </div>
-    </form>`;
-  }
-
-  // quoted: capture customer response → Negotiating
-  if (state === "quoted") {
-    return `<form method="POST" action="/call/${encodeURIComponent(callId)}/move-to-negotiating">
-      <div class="transition-bar">
-        <div style="width:100%;">
-          <div class="label" style="margin-bottom:10px;">💬 Customer responded to quote? Capture and advance to <strong>Negotiating</strong>:</div>
-          <div class="transition-row">
-            <select name="sentiment">
-              <option value="">Sentiment (optional)</option>
-              <option value="positive">Positive — likely to close</option>
-              <option value="negotiating">Negotiating — wants better terms</option>
-              <option value="objecting">Objecting — concerns to address</option>
-            </select>
-            <button type="submit" class="primary">Move to Negotiating</button>
-          </div>
-          <input type="text" name="notes" placeholder="Customer's specific objections / requests (optional)">
-        </div>
-      </div>
-    </form>`;
-  }
-
-  // negotiating: final outcome — Won / Lost / Nurture
-  return `<form method="POST" action="/call/${encodeURIComponent(callId)}/outcome">
-    <div class="outcome-bar">
-      <span class="label">Close the loop:</span>
-      <button type="submit" name="outcome" value="won" class="won">🎉 Closed Won</button>
-      <button type="submit" name="outcome" value="lost" class="lost">❌ Closed Lost</button>
-      <button type="submit" name="outcome" value="nurture" class="nurture">🌱 Nurture (revisit later)</button>
     </div>
-    <input type="hidden" name="note" value="">
   </form>`;
 }
 

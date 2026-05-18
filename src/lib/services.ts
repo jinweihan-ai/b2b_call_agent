@@ -459,80 +459,20 @@ export async function ackBriefingAction(
   return ok({ call: detailCall(rec) });
 }
 
-export interface MoveToQuotedArgs {
-  factory_price_usd?: number | null;
-  factory_lead_time_weeks?: number | null;
-  notes?: string | null;
-}
-export async function moveToQuotedAction(
+// v0.2: archive replaces move-to-quoted / move-to-negotiating / outcome.
+// Marks the lead "done from our side" — downstream tracking happens in the
+// customer's HubSpot / Salesforce / Feishu OA.
+export async function archiveAction(
   env: Bindings,
   callId: string,
-  args: MoveToQuotedArgs
-): Promise<ServiceResult<{ call: CallDetail }>> {
-  const rec = await loadRecord(env, callId);
-  if (!rec) return err("not_found", `call ${callId} not found`, 404);
-  const now = new Date().toISOString();
-  rec.actions = {
-    ...(rec.actions ?? {}),
-    quote: {
-      factory_confirmed_at: now,
-      factory_price_usd:
-        typeof args.factory_price_usd === "number" && Number.isFinite(args.factory_price_usd)
-          ? args.factory_price_usd
-          : undefined,
-      factory_lead_time_weeks:
-        typeof args.factory_lead_time_weeks === "number" && Number.isFinite(args.factory_lead_time_weeks)
-          ? args.factory_lead_time_weeks
-          : undefined,
-      quote_sent_to_customer_at: now,
-      notes: args.notes ?? undefined,
-    },
-  };
-  withStateChange(rec);
-  await saveRecord(env, rec);
-  return ok({ call: detailCall(rec) });
-}
-
-export interface MoveToNegotiatingArgs {
-  sentiment?: "positive" | "negotiating" | "objecting" | null;
-  notes?: string | null;
-}
-export async function moveToNegotiatingAction(
-  env: Bindings,
-  callId: string,
-  args: MoveToNegotiatingArgs
-): Promise<ServiceResult<{ call: CallDetail }>> {
-  const rec = await loadRecord(env, callId);
-  if (!rec) return err("not_found", `call ${callId} not found`, 404);
-  rec.actions = {
-    ...(rec.actions ?? {}),
-    customer_response: {
-      received_at: new Date().toISOString(),
-      sentiment: args.sentiment ?? undefined,
-      notes: args.notes ?? undefined,
-    },
-  };
-  withStateChange(rec);
-  await saveRecord(env, rec);
-  return ok({ call: detailCall(rec) });
-}
-
-export async function setOutcomeAction(
-  env: Bindings,
-  callId: string,
-  outcome: "won" | "lost" | "nurture",
   note: string | null
 ): Promise<ServiceResult<{ call: CallDetail }>> {
-  if (outcome !== "won" && outcome !== "lost" && outcome !== "nurture") {
-    return err("invalid_input", `outcome must be won|lost|nurture, got ${outcome}`, 400);
-  }
   const rec = await loadRecord(env, callId);
   if (!rec) return err("not_found", `call ${callId} not found`, 404);
   rec.actions = {
     ...(rec.actions ?? {}),
-    outcome,
-    outcome_at: new Date().toISOString(),
-    outcome_note: note ?? undefined,
+    archived_at: new Date().toISOString(),
+    archived_note: note ?? undefined,
   };
   withStateChange(rec);
   await saveRecord(env, rec);

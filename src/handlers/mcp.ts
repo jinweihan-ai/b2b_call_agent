@@ -9,9 +9,7 @@ import {
   sendCustomerSmsAction,
   sendSupplierRfqAction,
   ackBriefingAction,
-  moveToQuotedAction,
-  moveToNegotiatingAction,
-  setOutcomeAction,
+  archiveAction,
   listProducts,
   searchProductsAction,
   reindexLeadsAction,
@@ -201,49 +199,16 @@ const TOOLS = [
     },
   },
   {
-    name: "move_to_quoted",
+    name: "archive_lead",
     description:
-      "Advance the deal to Quoted: factory has confirmed pricing and lead time. Use after the supplier RFQ is filled.",
+      "Mark the lead as handed off to the customer's own CRM (HubSpot / Salesforce / Feishu). This is the only post-outreach action — downstream stages (quote / negotiation / close) are tracked in the customer's CRM, not here.",
     inputSchema: {
       type: "object",
       properties: {
         call_id: { type: "string" },
-        factory_price_usd: { type: ["number", "null"] },
-        factory_lead_time_weeks: { type: ["number", "null"] },
-        notes: { type: ["string", "null"] },
-      },
-      required: ["call_id"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "move_to_negotiating",
-    description: "Advance the deal to Negotiating: customer has engaged with the quote.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        call_id: { type: "string" },
-        sentiment: {
-          type: ["string", "null"],
-          enum: ["positive", "negotiating", "objecting", null],
-        },
-        notes: { type: ["string", "null"] },
-      },
-      required: ["call_id"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "close_deal",
-    description: "Close out the deal: won, lost, or nurture (re-engage later).",
-    inputSchema: {
-      type: "object",
-      properties: {
-        call_id: { type: "string" },
-        outcome: { type: "string", enum: ["won", "lost", "nurture"] },
         note: { type: ["string", "null"] },
       },
-      required: ["call_id", "outcome"],
+      required: ["call_id"],
       additionalProperties: false,
     },
   },
@@ -344,39 +309,9 @@ async function handleToolsCall(
       return toolResultFrom(await sendSupplierRfqAction(env, callIdArg, textArg));
     case "ack_briefing":
       return toolResultFrom(await ackBriefingAction(env, callIdArg));
-    case "move_to_quoted":
-      return toolResultFrom(
-        await moveToQuotedAction(env, callIdArg, {
-          factory_price_usd:
-            typeof args.factory_price_usd === "number" ? args.factory_price_usd : null,
-          factory_lead_time_weeks:
-            typeof args.factory_lead_time_weeks === "number" ? args.factory_lead_time_weeks : null,
-          notes: typeof args.notes === "string" ? args.notes : null,
-        })
-      );
-    case "move_to_negotiating": {
-      const s = args.sentiment;
-      const sentiment =
-        s === "positive" || s === "negotiating" || s === "objecting" ? s : null;
-      return toolResultFrom(
-        await moveToNegotiatingAction(env, callIdArg, {
-          sentiment,
-          notes: typeof args.notes === "string" ? args.notes : null,
-        })
-      );
-    }
-    case "close_deal": {
-      const outcome = args.outcome;
-      if (outcome !== "won" && outcome !== "lost" && outcome !== "nurture") {
-        return toolResultFrom({
-          ok: false as const,
-          code: "invalid_input",
-          message: "outcome must be won|lost|nurture",
-          status: 400,
-        });
-      }
+    case "archive_lead": {
       const note = typeof args.note === "string" ? args.note : null;
-      return toolResultFrom(await setOutcomeAction(env, callIdArg, outcome, note));
+      return toolResultFrom(await archiveAction(env, callIdArg, note));
     }
     case "list_products":
       return toolResultFrom(listProducts());

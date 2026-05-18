@@ -89,21 +89,19 @@ LLM 在这三个点上**结构性占优**：永远在线（解决 #1），英语
 
 ## 销售工作流程
 
-CRM 阶段是按制造业 B2B 习惯做的：
+本项目刻意把范围卡在**询盘进来后的头 24 小时** —— 也就是人工最容易掉链子的那一段。AI 把 briefing + 草稿 + 背调都打包好交给销售之后，剩下的报价 / 谈判 / 成交在你自己的 CRM (HubSpot / Salesforce / 飞书 OA / Airtable) 里走。
 
 ```
 [ new_lead ]         AI 已合格化, 销售还没发任何外联
    ↓ 3 个外联动作 (SMS / RFQ / Brief) 都完成
-[ outreach_sent ]    SMS + RFQ + briefing 都发了, 等客户和工厂反馈
-   ↓ 工厂确认报价
-[ quoted ]           正式报价发给客户
-   ↓ 客户回应
-[ negotiating ]      客户已经在和你谈, 进入收尾博弈
-   ↓
-[ closed_won ]   [ closed_lost ]   [ nurture (暂缓再跟进) ]
+[ outreach_sent ]    SMS + RFQ + briefing 都发了, 销售拿到完整 packet
+   ↓ 销售点 "Hand off to my CRM"
+[ archived ]         交接给 HubSpot / Salesforce / 飞书 / 等等
 ```
 
-每个阶段销售只需要审核 AI 做出的判断（型号选对了吗？回复文案行不行？要不要调整？），不需要从零起草。
+每一步销售只需要**审核**AI 做出的判断（型号选对了吗？回复文案行不行？要不要调整？），不用从零起草。Bad fit / 垃圾询盘 / 重复 lead 也能直接从 `new_lead` 跳过外联档案。
+
+**为什么不往下做：** 后续阶段（报价 / 谈判 / 成交）需要我们观察工厂的回复 + 客户在各种渠道的反馈，而那些渠道我们没法直接接管。靠销售手填一个 form 来"假装跟踪"，那就是 glorified form-filling 而已 —— 你现有的 CRM 已经做得很好，我们干净地交接给它。
 
 ## 技术栈
 
@@ -214,7 +212,7 @@ Streamable HTTP transport, JSON-RPC 2.0, 单一 `POST /mcp` 端点.
 }
 ```
 
-暴露的 15 个 tools：
+暴露的 13 个 tools：
 
 | Tool | 用途 |
 |---|---|
@@ -224,7 +222,7 @@ Streamable HTTP transport, JSON-RPC 2.0, 单一 `POST /mcp` 端点.
 | `list_calls` / `get_call` | 通话列表 / 详情 |
 | `send_sms` / `send_rfq` | 发客户 SMS / 发供应链询价 |
 | `ack_briefing` | 标记 briefing 已读 |
-| `move_to_quoted` / `move_to_negotiating` / `close_deal` | 阶段推进 |
+| `archive_lead` | 归档（交接给客户自己的 CRM） |
 | `list_products` / `search_products` | 产品目录 / 语义搜索 |
 | `reindex_leads` | 重建索引 |
 

@@ -89,21 +89,19 @@ Inbound call (any country, any timezone)
 
 ## Sales workflow
 
-The CRM pipeline matches B2B manufacturing convention:
+We deliberately scope this product to the **first 24 hours** of inquiry response — the part where humans drop the ball most. After we deliver the briefing + drafts + research, the deal continues in your own CRM (HubSpot / Salesforce / Feishu OA / Airtable), not here.
 
 ```
-[ new_lead ]         AI qualified; rep hasn't sent any outreach
+[ new_lead ]         AI qualified; sales rep hasn't sent outreach yet
    ↓ 3 outreach actions (SMS / RFQ / Brief) all complete
-[ outreach_sent ]    SMS + RFQ + briefing all sent; awaiting customer + factory
-   ↓ factory confirms pricing
-[ quoted ]           formal quote sent to customer
-   ↓ customer engages
-[ negotiating ]      active back-and-forth
-   ↓
-[ closed_won ]   [ closed_lost ]   [ nurture (re-engage later) ]
+[ outreach_sent ]    SMS + RFQ + briefing all sent; sales has the full packet
+   ↓ sales rep clicks "Hand off to my CRM"
+[ archived ]         Deal continues in HubSpot / Salesforce / Feishu / etc.
 ```
 
-At each stage the rep only **reviews** AI decisions (right SKU? acceptable copy? need a tweak?) — never drafts from scratch.
+At each step the rep only **reviews** AI decisions (right SKU? acceptable copy? need a tweak?) — never drafts from scratch. The "Archive" button is also reachable from `new_lead` for bad fits / spam / duplicates.
+
+**Why we stop here:** downstream stages (quote / negotiation / close) would require us to observe factory replies and customer responses across channels we don't control. Pretending to track them via manual sales-rep data entry would just be glorified form-filling. Your existing CRM already does this well — we hand off cleanly.
 
 ## Tech stack
 
@@ -212,7 +210,7 @@ Client config example:
 }
 ```
 
-15 tools exposed, mapping 1:1 to the REST endpoints. 3 static resources + 2 templates:
+13 tools exposed, mapping 1:1 to the REST endpoints. 3 static resources + 2 templates:
 
 - Static: `catalog://products`, `persons://all`, `calls://all`
 - Templates: `person://{phone}`, `call://{call_id}`

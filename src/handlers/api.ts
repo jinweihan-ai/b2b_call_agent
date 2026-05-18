@@ -10,9 +10,7 @@ import {
   sendCustomerSmsAction,
   sendSupplierRfqAction,
   ackBriefingAction,
-  moveToQuotedAction,
-  moveToNegotiatingAction,
-  setOutcomeAction,
+  archiveAction,
   listProducts,
   searchProductsAction,
   reindexLeadsAction,
@@ -91,8 +89,7 @@ api.get("/", (c) =>
       { method: "POST", path: "/api/v1/calls/:id/sms",                 body: { text: "string" }, desc: "Send SMS to caller via Agent Phone" },
       { method: "POST", path: "/api/v1/calls/:id/rfq",                 body: { text: "string" }, desc: "Post RFQ to #sourcing-china Slack" },
       { method: "POST", path: "/api/v1/calls/:id/briefing/ack",        body: {}, desc: "Mark internal briefing as read" },
-      { method: "POST", path: "/api/v1/calls/:id/stage",               body: { to: "quoted | negotiating", factory_price_usd: "number?", factory_lead_time_weeks: "number?", sentiment: "positive|negotiating|objecting?", notes: "string?" }, desc: "Transition pipeline stage" },
-      { method: "POST", path: "/api/v1/calls/:id/outcome",             body: { outcome: "won | lost | nurture", note: "string?" }, desc: "Close the deal" },
+      { method: "POST", path: "/api/v1/calls/:id/archive",             body: { note: "string?" }, desc: "Hand off lead to the customer's own CRM (terminal action)" },
       { method: "GET",  path: "/api/v1/products",                      desc: "Full FerroLaser catalog" },
       { method: "GET",  path: "/api/v1/products/search?q=...",         desc: "Semantic search via Supermemory" },
       { method: "POST", path: "/api/v1/admin/reindex",                 body: {}, desc: "Backfill lead index from existing call records" },
@@ -143,53 +140,13 @@ api.post("/calls/:id/briefing/ack", async (c) =>
   respond(await ackBriefingAction(c.env, c.req.param("id")))
 );
 
-api.post("/calls/:id/stage", async (c) => {
-  const body = await readJsonBody(c);
-  if (body === null) return respond({ ok: false, code: "invalid_json", message: "request body is not valid JSON", status: 400 });
-  const to = typeof body.to === "string" ? body.to : "";
-  if (to === "quoted") {
-    return respond(
-      await moveToQuotedAction(c.env, c.req.param("id"), {
-        factory_price_usd: typeof body.factory_price_usd === "number" ? body.factory_price_usd : null,
-        factory_lead_time_weeks:
-          typeof body.factory_lead_time_weeks === "number" ? body.factory_lead_time_weeks : null,
-        notes: typeof body.notes === "string" ? body.notes : null,
-      })
-    );
-  }
-  if (to === "negotiating") {
-    const s = body.sentiment;
-    const sentiment =
-      s === "positive" || s === "negotiating" || s === "objecting" ? s : null;
-    return respond(
-      await moveToNegotiatingAction(c.env, c.req.param("id"), {
-        sentiment,
-        notes: typeof body.notes === "string" ? body.notes : null,
-      })
-    );
-  }
-  return respond({
-    ok: false,
-    code: "invalid_input",
-    message: `to must be 'quoted' or 'negotiating', got ${String(to)}`,
-    status: 400,
-  });
-});
-
-api.post("/calls/:id/outcome", async (c) => {
-  const body = await readJsonBody(c);
-  if (body === null) return respond({ ok: false, code: "invalid_json", message: "request body is not valid JSON", status: 400 });
-  const outcome = body.outcome;
-  if (outcome !== "won" && outcome !== "lost" && outcome !== "nurture") {
-    return respond({
-      ok: false,
-      code: "invalid_input",
-      message: `outcome must be 'won'|'lost'|'nurture', got ${String(outcome)}`,
-      status: 400,
-    });
-  }
+// v0.2: archive replaces the M5 stage/outcome endpoints. Downstream tracking
+// happens in the customer's own CRM — we don't pretend to observe quoted /
+// negotiating / closed events.
+api.post("/calls/:id/archive", async (c) => {
+  const body = (await readJsonBody(c)) ?? {};
   const note = typeof body.note === "string" ? body.note : null;
-  return respond(await setOutcomeAction(c.env, c.req.param("id"), outcome, note));
+  return respond(await archiveAction(c.env, c.req.param("id"), note));
 });
 
 // ── Products ──
